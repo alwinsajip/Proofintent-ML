@@ -1,0 +1,15 @@
+model MLP_SMALL {
+    dense(in: 4, out: 8, weights: "weights/mlp_small/w1.json", bias: "weights/mlp_small/b1.json")
+    relu
+    dense(in: 8, out: 3, weights: "weights/mlp_small/w2.json", bias: "weights/mlp_small/b2.json")
+    argmax
+}
+
+input  x : private tensor[4] range[-1.0, 1.0]
+output y : public  class[3]
+
+prove {
+    model_is MLP_SMALL
+    inference(x) == y
+    confidence(x) >= 0.60
+}

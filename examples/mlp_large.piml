@@ -1,0 +1,16 @@
+model MLP_LARGE {
+    dense(in: 8, out: 16, weights: "weights/mlp_large/w1.json", bias: "weights/mlp_large/b1.json")
+    relu
+    dense(in: 16, out: 16, weights: "weights/mlp_large/w2.json", bias: "weights/mlp_large/b2.json")
+    relu
+    dense(in: 16, out: 10, weights: "weights/mlp_large/w3.json", bias: "weights/mlp_large/b3.json")
+    argmax
+}
+
+input  x : private tensor[8]
+output y : public  class[10]
+
+prove {
+    model_is MLP_LARGE
+    inference(x) == y
+}
