@@ -1,0 +1,52 @@
+{
+  "commitment": "cb4ef3e9cfa9de34affb397bc05a2dbb5670ff5d4f9b40229eff6e4f23300aa0",
+  "outputs": {
+    "y": 1,
+    "confidence": 0.35427699280219244
+  },
+  "witness_digest": "f707749fb4749e9bc9b4223eee30a66bdc79c08466b4f72cbf81af3789992928",
+  "transcript_digest": "1f0d57bc82d255140e807507f481b1ce0d6a039235f3f42b2653328a84f19b7f",
+  "checks_ok": true,
+  "checks": [
+    {
+      "cid": 0,
+      "kind": "dense",
+      "ok": true
+    },
+    {
+      "cid": 1,
+      "kind": "relu",
+      "ok": true
+    },
+    {
+      "cid": 2,
+      "kind": "dense",
+      "ok": true
+    },
+    {
+      "cid": 3,
+      "kind": "argmax",
+      "ok": true
+    },
+    {
+      "cid": 4,
+      "kind": "alias",
+      "ok": true
+    },
+    {
+      "cid": 5,
+      "kind": "softmax",
+      "ok": true
+    },
+    {
+      "cid": 6,
+      "kind": "range",
+      "ok": true
+    },
+    {
+      "cid": 7,
+      "kind": "model_commit",
+      "ok": true
+    }
+  ]
+}

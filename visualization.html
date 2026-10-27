@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ProofIntent-ML | ZK Pipeline & Compute Reduction Visualization</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- GSAP Core & Plugins -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+    
+    :root {
+      --bg-surface: #080c14;
+      --card-surface: #0d1322;
+      --card-border: rgba(56, 189, 248, 0.14);
+      --card-border-hover: rgba(56, 189, 248, 0.32);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-purple: #8b5cf6;
+      --accent-rose: #f43f5e;
+    }
+
+    body {
+      background-color: var(--bg-surface);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 10% 20%, rgba(6, 182, 212, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 40%),
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+    }
+
+    /* Browser Surfaces Theming */
+    ::selection {
+      background-color: rgba(6, 182, 212, 0.35);
+      color: #ffffff;
+    }
+
+    .num-tabular {
+      font-feature-settings: 'tnum';
+      font-variant-numeric: tabular-nums;
+    }
+
+    .code-font {
+      font-family: 'Fira Code', monospace;
+    }
+
+    .glass-card {
+      background: var(--card-surface);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Focus Visible System */
+    button:focus-visible, 
+    a:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--accent-cyan);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #080c14;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+
+    /* SVG Signal Wires Animation */
+    @keyframes wireDash {
+      to {
+        stroke-dashoffset: -32;
+      }
+    }
+
+    .wire-flow {
+      stroke-dasharray: 6, 6;
+      animation: wireDash 1.4s linear infinite;
+    }
+
+    /* Accessible Reduced Motion */
+    @media (prefers-reduced-motion: reduce) {
+      *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .wire-flow {
+        animation: none !important;
+        stroke-dasharray: none !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 lg:p-10 antialiased selection:bg-cyan-500/30">
+
+  <!-- TOP HEADER -->
+  <header class="max-w-7xl mx-auto mb-8">
+    <div class="glass-card p-6 md:p-8 relative">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div class="max-w-2xl">
+          <h1 class="text-3xl md:text-4xl font-bold tracking-tight text-white">
+            ProofIntent-ML Optimization Engine
+          </h1>
+          <p class="text-slate-400 text-sm md:text-base mt-2 leading-relaxed">
+            Semantic Zero-Knowledge compiler for deep learning inference. Demonstrates automatic dead-constraint elimination, constant propagation folding, and up to 80.58% cryptographic compute reduction.
+          </p>
+        </div>
+
+        <!-- Model Switcher & Compute Reduction Summary -->
+        <div class="flex flex-wrap items-center gap-4 bg-slate-950/70 p-3.5 rounded-xl border border-slate-800/80">
+          <div>
+            <span class="text-xs text-slate-400 font-medium block">Benchmark Benchmark Model</span>
+            <div class="flex gap-1.5 mt-1.5">
+              <button id="btn-mlp-large" onclick="switchModel('large')" aria-pressed="true" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-cyan-600 text-white shadow-sm transition-colors hover:bg-cyan-500">
+                MLP_LARGE (-80.6%)
+              </button>
+              <button id="btn-mlp-small" onclick="switchModel('small')" aria-pressed="false" class="px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 transition-colors hover:bg-slate-800">
+                MLP_SMALL (-29.0%)
+              </button>
+            </div>
+          </div>
+
+          <div class="h-10 w-px bg-slate-800 hidden sm:block"></div>
+
+          <div class="flex items-center gap-3">
+            <div>
+              <span class="text-xs text-slate-400 font-medium block">Compute Saved</span>
+              <span id="stat-reduction" class="text-2xl font-bold text-emerald-400 num-tabular">80.58%</span>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT -->
+  <main class="max-w-7xl mx-auto space-y-8">
+
+    <!-- SECTION 1: INTERACTIVE PIPELINE FLOW STEPPER -->
+    <section class="glass-card p-6 md:p-8">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-xl md:text-2xl font-bold text-white tracking-tight">
+            Compiler Pipeline Transformations
+          </h2>
+          <p class="text-xs md:text-sm text-slate-400 mt-1">
+            Track signals through each compiler pass to observe how declared proof intents eliminate wasted arithmetic gates.
+          </p>
+        </div>
+
+        <!-- Playback Controls -->
+        <div class="flex items-center gap-2">
+          <button id="btn-prev-stage" onclick="stepStage(-1)" aria-label="Previous compiler stage" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            Previous
+          </button>
+          <button id="btn-play-pause" onclick="toggleAutoPlay()" aria-label="Toggle pipeline animation walkthrough" class="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+            <svg id="play-icon" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            <span id="play-label">Play Pipeline</span>
+          </button>
+          <button id="btn-next-stage" onclick="stepStage(1)" aria-label="Next compiler stage" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition">
+            Next
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stage Selector Tabs -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6" role="tablist">
+        <button onclick="goToStage(0)" id="pill-stage-0" role="tab" aria-selected="true" class="stage-pill p-3.5 rounded-xl border text-left transition-all duration-200 bg-cyan-950/40 border-cyan-500/50 text-cyan-200">
+          <div class="text-xs font-semibold text-white">DSL Specification</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">High-Level .piml Syntax</div>
+        </button>
+
+        <button onclick="goToStage(1)" id="pill-stage-1" role="tab" aria-selected="false" class="stage-pill p-3.5 rounded-xl border text-left transition-all duration-200 bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700">
+          <div class="text-xs font-semibold text-slate-300">Semantic Analyzer</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">Type & Shape Validation</div>
+        </button>
+
+        <button onclick="goToStage(2)" id="pill-stage-2" role="tab" aria-selected="false" class="stage-pill p-3.5 rounded-xl border text-left transition-all duration-200 bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700">
+          <div class="text-xs font-semibold text-slate-300">Dual IR Lowering</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">ML IR & Proof IR Graphs</div>
+        </button>
+
+        <button onclick="goToStage(3)" id="pill-stage-3" role="tab" aria-selected="false" class="stage-pill p-3.5 rounded-xl border text-left transition-all duration-200 bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700">
+          <div class="text-xs font-semibold text-slate-300">Optimization Engine</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">Pruning & Quantization</div>
+        </button>
+
+        <button onclick="goToStage(4)" id="pill-stage-4" role="tab" aria-selected="false" class="stage-pill p-3.5 rounded-xl border text-left transition-all duration-200 bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700">
+          <div class="text-xs font-semibold text-slate-300">Circom 2.0 Codegen</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">Witness & Verification</div>
+        </button>
+      </div>
+
+      <!-- Stage Context Banner -->
+      <div id="stage-banner" class="bg-slate-950/80 rounded-xl p-4 border border-cyan-500/25 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 id="stage-title" class="text-sm font-semibold text-white">Stage: Domain-Specific Language (.piml) Frontend</h3>
+          <p id="stage-desc" class="text-xs text-slate-400 mt-1 max-w-3xl">
+            Engineers specify neural network layers and declarative proof intents (such as inference accuracy and input bounds) instead of manually wiring low-level R1CS arithmetic circuits.
+          </p>
+        </div>
+        <div class="shrink-0">
+          <span id="stage-metric-badge" class="px-3 py-1 rounded-full text-xs font-medium bg-cyan-950/60 text-cyan-300 border border-cyan-800/60">
+            Source Parsing & AST Construction
+          </span>
+        </div>
+      </div>
+
+      <!-- SVG COMPUTATION GRAPH (GSAP POWERED) -->
+      <div class="bg-slate-950 rounded-xl border border-slate-800/80 p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800/80">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+            <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider">Circuit Signal Architecture</span>
+          </div>
+          <div class="flex items-center gap-4 text-xs font-mono">
+            <span class="text-slate-400">Active R1CS Constraints: <strong id="live-r1cs-count" class="text-cyan-400 font-bold text-sm num-tabular">103</strong></span>
+            <span class="text-slate-600">|</span>
+            <span class="text-slate-400">Prover Latency: <strong id="live-prover-time" class="text-amber-400 font-bold text-sm num-tabular">71.30 ms</strong></span>
+          </div>
+        </div>
+
+        <!-- SVG Visualizer -->
+        <div class="overflow-x-auto py-2">
+          <svg id="pipeline-svg" class="w-full min-w-[760px] h-64" viewBox="0 0 900 240" aria-label="Visual representation of neural circuit nodes and wires">
+            <defs>
+              <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#0284c7"/>
+                <stop offset="100%" stop-color="#0369a1"/>
+              </linearGradient>
+            </defs>
+
+            <!-- CONNECTOR WIRES -->
+            <g id="wires-group">
+              <path id="wire-in-l0" d="M 90 120 L 140 120" stroke="#0ea5e9" stroke-width="2" class="wire-flow"/>
+              <path id="wire-l0-l1" d="M 230 120 L 270 120" stroke="#0ea5e9" stroke-width="2" class="wire-flow"/>
+              <path id="wire-l1-l2" d="M 360 120 L 400 120" stroke="#0ea5e9" stroke-width="2" class="wire-flow"/>
+              <path id="wire-l2-l3" d="M 490 120 L 530 120" stroke="#0ea5e9" stroke-width="2" class="wire-flow"/>
+              <!-- Bypass wire after layer 2 constant folding -->
+              <path id="wire-bypass" d="M 360 100 C 420 45, 470 45, 530 100" stroke="#10b981" stroke-width="2.5" stroke-dasharray="4,4" opacity="0" fill="none"/>
+              <path id="wire-l3-argmax" d="M 620 120 L 660 120" stroke="#0ea5e9" stroke-width="2" class="wire-flow"/>
+              <path id="wire-l3-softmax" d="M 620 135 C 640 190, 650 190, 660 190" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="3,3"/>
+              <path id="wire-argmax-out" d="M 750 120 L 790 120" stroke="#10b981" stroke-width="2" class="wire-flow"/>
+              <path id="wire-commit" d="M 230 145 C 300 210, 500 210, 790 190" stroke="#8b5cf6" stroke-width="1.8" stroke-dasharray="4,4"/>
+            </g>
+
+            <!-- NODES -->
+            <!-- Input Node -->
+            <g id="node-input" transform="translate(10, 90)">
+              <rect width="80" height="60" rx="8" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5"/>
+              <text x="40" y="26" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="middle">INPUT</text>
+              <text x="40" y="44" fill="#38bdf8" font-size="12" font-family="'Fira Code', monospace" font-weight="600" text-anchor="middle">x : [8]</text>
+            </g>
+
+            <!-- Dense L0 -->
+            <g id="node-l0" transform="translate(140, 85)">
+              <rect width="90" height="70" rx="10" fill="url(#cyanGrad)" stroke="#38bdf8" stroke-width="1.2"/>
+              <text x="45" y="25" fill="#ffffff" font-size="11" font-weight="600" text-anchor="middle">Dense L0</text>
+              <text x="45" y="42" fill="#e0f2fe" font-size="9.5" text-anchor="middle">8 -> 16 units</text>
+              <rect x="15" y="49" width="60" height="15" rx="4" fill="#0c4a6e"/>
+              <text x="45" y="60" fill="#7dd3fc" font-size="8.5" font-family="'Fira Code', monospace" text-anchor="middle">cost: 16 r1cs</text>
+            </g>
+
+            <!-- ReLU L1 -->
+            <g id="node-l1" transform="translate(270, 92)">
+              <rect width="90" height="56" rx="8" fill="#0f172a" stroke="#0ea5e9" stroke-width="1.5"/>
+              <text x="45" y="24" fill="#38bdf8" font-size="11" font-weight="600" text-anchor="middle">ReLU</text>
+              <text x="45" y="40" fill="#94a3b8" font-size="9" text-anchor="middle">16 units (quant)</text>
+              <text x="45" y="50" fill="#0284c7" font-size="8.5" font-family="'Fira Code', monospace" text-anchor="middle">cost: 1 r1cs</text>
+            </g>
+
+            <!-- Dense L2 (Prunable Zero Weight Layer) -->
+            <g id="node-l2" transform="translate(400, 75)">
+              <rect id="rect-l2" width="90" height="90" rx="10" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5"/>
+              <text id="txt-l2-title" x="45" y="25" fill="#fbbf24" font-size="11" font-weight="600" text-anchor="middle">Dense L2</text>
+              <text id="txt-l2-shape" x="45" y="42" fill="#94a3b8" font-size="9.5" text-anchor="middle">16 -> 16 units</text>
+              <text id="txt-l2-zero" x="45" y="58" fill="#f43f5e" font-size="9" font-weight="600" text-anchor="middle">W=0, B=0</text>
+              <rect id="badge-l2-cost" x="15" y="66" width="60" height="16" rx="4" fill="#451a03"/>
+              <text id="txt-l2-cost" x="45" y="78" fill="#fbbf24" font-size="8.5" font-family="'Fira Code', monospace" text-anchor="middle">cost: 64 r1cs</text>
+              <!-- Strike mark on optimization -->
+              <path id="cross-l2" d="M 15 15 L 75 75 M 75 15 L 15 75" stroke="#f43f5e" stroke-width="3" opacity="0" stroke-linecap="round"/>
+            </g>
+
+            <!-- Dense L3 -->
+            <g id="node-l3" transform="translate(530, 85)">
+              <rect width="90" height="70" rx="10" fill="url(#cyanGrad)" stroke="#38bdf8" stroke-width="1.2"/>
+              <text x="45" y="25" fill="#ffffff" font-size="11" font-weight="600" text-anchor="middle">Dense L3</text>
+              <text x="45" y="42" fill="#e0f2fe" font-size="9.5" text-anchor="middle">16 -> 10 units</text>
+              <rect x="15" y="49" width="60" height="15" rx="4" fill="#0c4a6e"/>
+              <text x="45" y="60" fill="#7dd3fc" font-size="8.5" font-family="'Fira Code', monospace" text-anchor="middle">cost: 10 r1cs</text>
+            </g>
+
+            <!-- ArgMax Node -->
+            <g id="node-argmax" transform="translate(660, 92)">
+              <rect width="90" height="56" rx="8" fill="#0f172a" stroke="#10b981" stroke-width="1.5"/>
+              <text x="45" y="24" fill="#10b981" font-size="11" font-weight="600" text-anchor="middle">ArgMax</text>
+              <text x="45" y="39" fill="#94a3b8" font-size="9" text-anchor="middle">Class Index</text>
+              <text x="45" y="50" fill="#10b981" font-size="8.5" font-family="'Fira Code', monospace" text-anchor="middle">cost: 2 r1cs</text>
+            </g>
+
+            <!-- Softmax Head (Dead Constraint Branch) -->
+            <g id="node-softmax" transform="translate(660, 165)">
+              <rect id="rect-softmax" width="90" height="48" rx="8" fill="#0f172a" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3,3"/>
+              <text id="txt-softmax-title" x="45" y="20" fill="#fbbf24" font-size="10" font-weight="600" text-anchor="middle">Softmax Head</text>
+              <text id="txt-softmax-desc" x="45" y="33" fill="#f43f5e" font-size="8.5" text-anchor="middle">Unused in Intent</text>
+              <text id="txt-softmax-cost" x="45" y="44" fill="#fbbf24" font-size="8.5" font-family="'Fira Code', monospace" text-anchor="middle">cost: 10 r1cs</text>
+              <path id="cross-softmax" d="M 20 10 L 70 38 M 70 10 L 20 38" stroke="#f43f5e" stroke-width="2.5" opacity="0" stroke-linecap="round"/>
+            </g>
+
+            <!-- Output Node -->
+            <g id="node-output" transform="translate(790, 90)">
+              <rect width="90" height="60" rx="8" fill="#064e3b" stroke="#34d399" stroke-width="1.5"/>
+              <text x="45" y="25" fill="#6ee7b7" font-size="10" font-weight="600" text-anchor="middle">OUTPUT</text>
+              <text x="45" y="43" fill="#ffffff" font-size="12" font-family="'Fira Code', monospace" font-weight="600" text-anchor="middle">y : class[10]</text>
+            </g>
+
+            <!-- SHA-256 Model Commitment Node -->
+            <g id="node-commit" transform="translate(790, 165)">
+              <rect width="90" height="50" rx="8" fill="#3b0764" stroke="#a855f7" stroke-width="1.2"/>
+              <text x="45" y="20" fill="#d8b4fe" font-size="9" font-weight="600" text-anchor="middle">SHA-256 COMMIT</text>
+              <text x="45" y="34" fill="#e9d5ff" font-size="8" font-family="'Fira Code', monospace" text-anchor="middle">cb4ef3... ok</text>
+              <text x="45" y="44" fill="#c084fc" font-size="7.5" text-anchor="middle">cost: 1 r1cs</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-4 pt-3 mt-2 border-t border-slate-800/80 text-xs text-slate-400">
+          <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-cyan-500"></span> Active Operator</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-amber-500"></span> Candidate for Pruning</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-emerald-500"></span> Verified Output</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded bg-purple-500"></span> Cryptographic Hash</span>
+          </div>
+          <div id="animation-status-text" class="text-slate-400 font-mono text-xs">
+            Baseline: All layers and constraint heads active
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 2: CODE COMPARISON (TRADITIONAL VS PROOFINTENT-ML) -->
+    <section class="glass-card p-6 md:p-8">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 class="text-xl md:text-2xl font-bold text-white tracking-tight">
+            Circuit Comparison: Traditional Circom vs. Declarative DSL
+          </h2>
+          <p class="text-xs md:text-sm text-slate-400 mt-1">
+            Compare manual, error-prone signal wiring against semantic, intent-directed compiler declarations.
+          </p>
+        </div>
+
+        <div>
+          <button id="btn-toggle-diff" onclick="toggleCodeHighlights()" aria-pressed="false" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-2 transition">
+            <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            <span id="diff-toggle-text">Highlight Pruned Waste</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- LEFT: TRADITIONAL CIRCOM CODE -->
+        <div class="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex flex-col">
+          <div class="bg-slate-900/60 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-200 uppercase tracking-wider">Traditional Circuit Implementation</span>
+            <span class="text-[11px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">103 Constraints | 71ms</span>
+          </div>
+
+          <div class="p-4 overflow-y-auto max-h-[380px] code-font text-xs leading-relaxed text-slate-300">
+            <div class="text-slate-500 mb-2">// Manual low-level signal declarations and plumbing</div>
+            <div class="text-purple-400">template <span class="text-amber-300">NaiveMLP</span>() {</div>
+            <div class="pl-4 text-slate-400">signal input x[8];</div>
+            <div class="pl-4 text-slate-400">signal input w1[16][8], b1[16];</div>
+            <div id="code-left-prune-1" class="pl-4 text-slate-300 transition-colors duration-200 py-0.5 rounded">
+              signal input w2[16][16], b2[16]; <span class="text-slate-500 text-[11px]">// Dead weights kept in circuit</span>
+            </div>
+            <div class="pl-4 text-slate-400">signal input w3[10][16], b3[10];</div>
+            <div class="pl-4 text-slate-400">signal output y[10];</div>
+            <br>
+            <div class="text-slate-500 pl-4">// Forces quadratic computation of unneeded layers:</div>
+            <div class="pl-4 text-cyan-300">component l0 = Dense(8, 16);</div>
+            <div class="pl-4 text-cyan-300">component r0 = ReLU(16);</div>
+            <div id="code-left-prune-2" class="pl-4 text-slate-300 transition-colors duration-200 py-1 rounded">
+              component l1 = Dense(16, 16); <span class="text-rose-400">// +64 R1CS wasted</span><br>
+              component r1 = ReLU(16); <span class="text-rose-400">// +16 R1CS wasted</span>
+            </div>
+            <div class="pl-4 text-cyan-300">component l2 = Dense(16, 10);</div>
+            <br>
+            <div class="text-slate-500 pl-4">// Expensive non-linear Softmax forced without intent:</div>
+            <div id="code-left-prune-3" class="pl-4 text-slate-300 transition-colors duration-200 py-1 rounded">
+              component sm = Softmax(10); <span class="text-rose-400">// +10 R1CS wasted</span><br>
+              signal conf &lt;== sm.out;
+            </div>
+            <div class="pl-4 text-cyan-300">component am = ArgMax(10);</div>
+            <div class="pl-4 text-emerald-400">y &lt;== am.out;</div>
+            <div class="text-purple-400">}</div>
+          </div>
+
+          <div class="p-3 bg-slate-900/40 border-t border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+            <span>Blind evaluation without intent semantics</span>
+            <span class="font-bold text-slate-200">103 Constraints Total</span>
+          </div>
+        </div>
+
+        <!-- RIGHT: PROOFINTENT-ML DSL -->
+        <div class="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex flex-col">
+          <div class="bg-slate-900/60 px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider">ProofIntent-ML Domain-Specific Language</span>
+            <span class="text-[11px] font-mono text-emerald-400 bg-slate-950 px-2 py-0.5 rounded border border-emerald-900/50">20 Constraints | 13ms</span>
+          </div>
+
+          <div class="p-4 overflow-y-auto max-h-[380px] code-font text-xs leading-relaxed text-slate-300">
+            <div class="text-slate-500 mb-2">// High-level neural declaration with weights bindings</div>
+            <div class="text-cyan-400">model <span class="text-amber-300">MLP_LARGE</span> {</div>
+            <div class="pl-4 text-slate-300">dense(in: <span class="text-amber-400">8</span>, out: <span class="text-amber-400">16</span>, weights: <span class="text-emerald-300">"w1.json"</span>, bias: <span class="text-emerald-300">"b1.json"</span>)</div>
+            <div class="pl-4 text-slate-300">relu</div>
+            <div id="code-right-opt-1" class="pl-4 text-slate-300 transition-colors duration-200 py-0.5 rounded">
+              dense(in: <span class="text-amber-400">16</span>, out: <span class="text-amber-400">16</span>, weights: <span class="text-emerald-300">"w2.json"</span>, bias: <span class="text-emerald-300">"b2.json"</span>) <span class="text-emerald-400 text-[11px]">// Pruned</span>
+            </div>
+            <div id="code-right-opt-2" class="pl-4 text-slate-300 transition-colors duration-200 py-0.5 rounded">
+              relu <span class="text-emerald-400 text-[11px]">// Folded</span>
+            </div>
+            <div class="pl-4 text-slate-300">dense(in: <span class="text-amber-400">16</span>, out: <span class="text-amber-400">10</span>, weights: <span class="text-emerald-300">"w3.json"</span>, bias: <span class="text-emerald-300">"b3.json"</span>)</div>
+            <div class="pl-4 text-slate-300">argmax</div>
+            <div class="text-cyan-400">}</div>
+            <br>
+            <div class="text-purple-300">input  <span class="text-cyan-300">x</span> : private tensor[8]</div>
+            <div class="text-purple-300">output <span class="text-emerald-300">y</span> : public  class[10]</div>
+            <br>
+            <div class="text-slate-500">// Semantic Intent dictates emitted constraint graph:</div>
+            <div class="text-emerald-400">prove {</div>
+            <div class="pl-4 text-slate-200">model_is <span class="text-amber-300">MLP_LARGE</span> <span class="text-slate-500 text-[11px]">// SHA-256 weight hash check</span></div>
+            <div class="pl-4 text-slate-200">inference(x) == y <span class="text-cyan-400 text-[11px]">// Softmax omitted automatically</span></div>
+            <div class="text-emerald-400">}</div>
+          </div>
+
+          <div class="p-3 bg-slate-900/40 border-t border-slate-800 text-xs text-slate-400 flex items-center justify-between">
+            <span>Intent-driven pruning + zero-weight folding</span>
+            <span class="font-bold text-emerald-400">20 Constraints (-80.58%)</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: COMPUTE REDUCTION BENCHMARKS & VERIFICATION -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Benchmark Breakdown Waterfall -->
+      <div class="glass-card p-6 md:p-8 lg:col-span-2">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-lg md:text-xl font-bold text-white tracking-tight">
+              R1CS Compute Optimization Breakdown
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Hardware-measured constraint reduction across optimization passes.</p>
+          </div>
+          <span class="text-xs font-mono text-emerald-400 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-900/60">
+            Hardware Benchmark
+          </span>
+        </div>
+
+        <div class="space-y-4 my-6">
+          <!-- Baseline -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-300 font-medium">Baseline Circuit</span>
+              <span class="font-mono text-slate-300 font-semibold num-tabular">103 Constraints (100%)</span>
+            </div>
+            <div class="w-full bg-slate-900 h-6 rounded-lg overflow-hidden flex">
+              <div id="bar-baseline" class="bg-slate-600 h-full text-[10px] font-bold text-white flex items-center pl-3" style="width: 100%;">
+                103 R1CS
+              </div>
+            </div>
+          </div>
+
+          <!-- Constant Prop -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-amber-300 font-medium">Constant Propagation (Pruned Zero Layer)</span>
+              <span class="font-mono text-amber-300 font-semibold num-tabular">-64 Constraints (-62.1%)</span>
+            </div>
+            <div class="w-full bg-slate-900 h-6 rounded-lg overflow-hidden">
+              <div id="bar-constprop" class="bg-amber-600 h-full text-[10px] font-bold text-slate-950 flex items-center pl-3 transition-all duration-700" style="width: 62.1%;">
+                Layer 2 Folds
+              </div>
+            </div>
+          </div>
+
+          <!-- Dead-Constraint Elimination -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-cyan-300 font-medium">Intent-Driven Dead-Constraint Elimination</span>
+              <span class="font-mono text-cyan-300 font-semibold num-tabular">-10 Constraints (-9.7%)</span>
+            </div>
+            <div class="w-full bg-slate-900 h-6 rounded-lg overflow-hidden">
+              <div id="bar-deadconst" class="bg-cyan-600 h-full text-[10px] font-bold text-slate-950 flex items-center pl-3 transition-all duration-700" style="width: 9.7%;">
+                Softmax Pruned
+              </div>
+            </div>
+          </div>
+
+          <!-- Quantization -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-purple-300 font-medium">Fixed-Point Quantization</span>
+              <span class="font-mono text-purple-300 font-semibold num-tabular">-9 Constraints (-8.7%)</span>
+            </div>
+            <div class="w-full bg-slate-900 h-6 rounded-lg overflow-hidden">
+              <div id="bar-quant" class="bg-purple-600 h-full text-[10px] font-bold text-white flex items-center pl-3 transition-all duration-700" style="width: 8.7%;">
+                Quantized Ops
+              </div>
+            </div>
+          </div>
+
+          <!-- Final -->
+          <div class="pt-2 border-t border-slate-800">
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-emerald-400 font-semibold">Final Optimized Circom Circuit</span>
+              <span class="font-mono text-emerald-400 font-bold text-sm num-tabular">20 Constraints (19.4%)</span>
+            </div>
+            <div class="w-full bg-slate-900 h-7 rounded-lg overflow-hidden flex">
+              <div id="bar-final" class="bg-emerald-500 h-full text-xs font-bold text-slate-950 flex items-center pl-3 transition-all duration-700" style="width: 19.4%;">
+                20 R1CS ONLY
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-center pt-2">
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-[11px] text-slate-400 uppercase font-medium block">Prover Latency</span>
+            <div id="metric-latency" class="text-base font-bold text-amber-400 mt-1 num-tabular">71.3ms -> 13.5ms</div>
+            <span class="text-[10px] text-emerald-400 mt-0.5 block">5.3x Prover Speedup</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-[11px] text-slate-400 uppercase font-medium block">Constraint Rows</span>
+            <div id="metric-rows" class="text-base font-bold text-cyan-400 mt-1 num-tabular">9 rows -> 4 rows</div>
+            <span class="text-[10px] text-emerald-400 mt-0.5 block">55.5% Graph Compaction</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-[11px] text-slate-400 uppercase font-medium block">RAM Overhead</span>
+            <div id="metric-mem" class="text-base font-bold text-purple-400 mt-1 num-tabular">34.9 KB -> 34.5 KB</div>
+            <span class="text-[10px] text-slate-400 mt-0.5 block">Zero Allocation Bloat</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cryptographic Tamper Simulator -->
+      <div class="glass-card p-6 md:p-8 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-lg font-bold text-white tracking-tight">
+              Cryptographic Soundness
+            </h3>
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          </div>
+          <p class="text-xs text-slate-400 mb-4">
+            Simulate how ZK witness evaluation and SHA-256 parameter commitments guarantee integrity.
+          </p>
+
+          <div id="verify-box" class="p-4 rounded-xl border bg-emerald-950/20 border-emerald-500/40 mb-4 transition-all duration-200">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-semibold text-emerald-300 uppercase tracking-wide">Verification State</span>
+              <span id="verify-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500 text-slate-950">
+                VERIFIED (OK)
+              </span>
+            </div>
+            <div id="verify-message" class="text-xs text-slate-300 font-mono leading-relaxed">
+              Proof constraint check: 8/8 satisfied.<br>
+              Model Commitment: SHA-256 verified.<br>
+              Prediction Transcript: Authentic.
+            </div>
+          </div>
+
+          <div class="space-y-2">
+            <button onclick="simulateVerification('honest')" class="w-full py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 flex items-center justify-between transition active:scale-[0.99]">
+              <span>Run Honest Verification</span>
+              <span class="text-emerald-400 font-mono text-[11px]">is_valid = True</span>
+            </button>
+
+            <button onclick="simulateVerification('tamper-model')" class="w-full py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 flex items-center justify-between transition active:scale-[0.99]">
+              <span>Tamper Model Weights (Bit Flip)</span>
+              <span class="text-rose-400 font-mono text-[11px]">Rejects (False)</span>
+            </button>
+
+            <button onclick="simulateVerification('tamper-pred')" class="w-full py-2.5 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 flex items-center justify-between transition active:scale-[0.99]">
+              <span>Tamper Prediction Transcript</span>
+              <span class="text-amber-400 font-mono text-[11px]">Rejects (False)</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-4 mt-4 border-t border-slate-800/80 text-[11px] text-slate-500 flex items-center justify-between">
+          <span>Engine: proofintent.runtime</span>
+          <span class="text-cyan-400 font-medium">Pure Python stdlib</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JAVASCRIPT & GSAP ANIMATION LOGIC -->
+  <script>
+    const MODEL_DATA = {
+      large: {
+        name: 'MLP_LARGE',
+        reduction: '80.58%',
+        baselineR1CS: 103,
+        optimizedR1CS: 20,
+        baselineLatency: '71.30 ms',
+        optimizedLatency: '13.46 ms',
+        speedup: '5.3x Prover Speedup',
+        baselineRows: '9 rows',
+        optimizedRows: '4 rows',
+        mem: '34.9 KB -> 34.5 KB',
+        constPropCost: 64,
+        deadCost: 10,
+        quantCost: 9,
+        prunableLayerText: 'W=0, B=0',
+        hasPrunedLayer: true
+      },
+      small: {
+        name: 'MLP_SMALL',
+        reduction: '29.03%',
+        baselineR1CS: 31,
+        optimizedR1CS: 22,
+        baselineLatency: '19.67 ms',
+        optimizedLatency: '13.54 ms',
+        speedup: '1.45x Prover Speedup',
+        baselineRows: '8 rows',
+        optimizedRows: '8 rows',
+        mem: '13.1 KB -> 12.0 KB',
+        constPropCost: 0,
+        deadCost: 0,
+        quantCost: 9,
+        prunableLayerText: 'Active Weights',
+        hasPrunedLayer: false
+      }
+    };
+
+    let currentModel = 'large';
+    let currentStage = 0;
+    let autoPlayInterval = null;
+    let diffHighlighted = false;
+
+    const STAGE_CONFIGS = [
+      {
+        title: "Stage: Domain-Specific Language (.piml) Frontend",
+        desc: "Engineers specify neural network layers and declarative proof intents (such as inference accuracy and input bounds) instead of manually wiring low-level R1CS arithmetic circuits.",
+        badge: "Source Parsing & AST Construction",
+        r1cs: 103,
+        latency: "71.30 ms",
+        showOptimizations: false
+      },
+      {
+        title: "Stage: Semantic Analyzer & Type Checking",
+        desc: "Statically validates tensor dimensions across interconnected layers, checks range bounds, and produces diagnostics with source location tracking.",
+        badge: "Semantic Validation Verified",
+        r1cs: 103,
+        latency: "71.30 ms",
+        showOptimizations: false
+      },
+      {
+        title: "Stage: Dual IR Lowering (ML IR + Proof IR)",
+        desc: "Lowers AST into two separate intermediate representations: an ML operation graph (MLModule) and an unoptimized baseline constraint module (ProofModule).",
+        badge: "Dual IR Generated (Baseline: 103 R1CS)",
+        r1cs: 103,
+        latency: "71.30 ms",
+        showOptimizations: false
+      },
+      {
+        title: "Stage: Optimization Engine (Constant Propagation & Dead Constraints)",
+        desc: "The core optimization engine: constant propagation eliminates zero-weight Layer 2, while intent-driven dead-constraint elimination prunes unused Softmax arithmetic gates.",
+        badge: "80.58% Constraints Eliminated",
+        r1cs: 20,
+        latency: "13.46 ms",
+        showOptimizations: true
+      },
+      {
+        title: "Stage: Backend Code Generation (Circom 2.0 & Proof Simulation)",
+        desc: "Emits optimized Circom 2.0 template code (Dense, ReLU, ArgMax, Main) and executes reference witness generation and SHA-256 model commitment verification.",
+        badge: "Circom Circuit Synthesized & Verified",
+        r1cs: 20,
+        latency: "13.46 ms",
+        showOptimizations: true
+      }
+    ];
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initGsapIntro();
+      renderStage(0);
+    });
+
+    function initGsapIntro() {
+      if (typeof gsap !== 'undefined') {
+        gsap.from("header", { opacity: 0, y: -20, duration: 0.6, ease: "power2.out" });
+        gsap.from("section", { opacity: 0, y: 24, duration: 0.6, stagger: 0.15, ease: "power2.out", delay: 0.15 });
+      }
+    }
+
+    function switchModel(modelKey) {
+      currentModel = modelKey;
+      const data = MODEL_DATA[modelKey];
+
+      const btnLarge = document.getElementById('btn-mlp-large');
+      const btnSmall = document.getElementById('btn-mlp-small');
+
+      if (modelKey === 'large') {
+        btnLarge.className = "px-3.5 py-2 rounded-lg text-xs font-semibold bg-cyan-600 text-white shadow-sm transition-colors hover:bg-cyan-500";
+        btnLarge.setAttribute('aria-pressed', 'true');
+        btnSmall.className = "px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 transition-colors hover:bg-slate-800";
+        btnSmall.setAttribute('aria-pressed', 'false');
+      } else {
+        btnSmall.className = "px-3.5 py-2 rounded-lg text-xs font-semibold bg-cyan-600 text-white shadow-sm transition-colors hover:bg-cyan-500";
+        btnSmall.setAttribute('aria-pressed', 'true');
+        btnLarge.className = "px-3.5 py-2 rounded-lg text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800 transition-colors hover:bg-slate-800";
+        btnLarge.setAttribute('aria-pressed', 'false');
+      }
+
+      document.getElementById('stat-reduction').textContent = data.reduction;
+      document.getElementById('metric-latency').textContent = `${data.baselineLatency} -> ${data.optimizedLatency}`;
+      document.getElementById('metric-rows').textContent = `${data.baselineRows} -> ${data.optimizedRows}`;
+      document.getElementById('metric-mem').textContent = data.mem;
+
+      if (typeof gsap !== 'undefined') {
+        gsap.to('#bar-constprop', { width: modelKey === 'large' ? '62.1%' : '0%', duration: 0.6, ease: "power2.out" });
+        gsap.to('#bar-deadconst', { width: modelKey === 'large' ? '9.7%' : '0%', duration: 0.6, ease: "power2.out" });
+        gsap.to('#bar-final', { width: modelKey === 'large' ? '19.4%' : '70.9%', duration: 0.6, ease: "power2.out" });
+      }
+
+      renderStage(currentStage);
+    }
+
+    function goToStage(stageIdx) {
+      currentStage = stageIdx;
+      renderStage(stageIdx);
+    }
+
+    function stepStage(delta) {
+      let nextStage = currentStage + delta;
+      if (nextStage < 0) nextStage = 4;
+      if (nextStage > 4) nextStage = 0;
+      goToStage(nextStage);
+    }
+
+    function renderStage(stageIdx) {
+      const stage = STAGE_CONFIGS[stageIdx];
+      const model = MODEL_DATA[currentModel];
+
+      for (let i = 0; i < 5; i++) {
+        const pill = document.getElementById(`pill-stage-${i}`);
+        if (i === stageIdx) {
+          pill.className = "stage-pill p-3.5 rounded-xl border text-left transition-all duration-200 bg-cyan-950/40 border-cyan-500/50 text-cyan-200";
+          pill.setAttribute('aria-selected', 'true');
+        } else {
+          pill.className = "stage-pill p-3.5 rounded-xl border text-left transition-all duration-200 bg-slate-950/40 border-slate-800 text-slate-400 hover:border-slate-700";
+          pill.setAttribute('aria-selected', 'false');
+        }
+      }
+
+      document.getElementById('stage-title').textContent = stage.title;
+      document.getElementById('stage-desc').textContent = stage.desc;
+      document.getElementById('stage-metric-badge').textContent = stage.badge;
+
+      const targetR1CS = stage.showOptimizations ? model.optimizedR1CS : model.baselineR1CS;
+      const targetLatency = stage.showOptimizations ? model.optimizedLatency : model.baselineLatency;
+
+      animateCounter('live-r1cs-count', targetR1CS);
+      document.getElementById('live-prover-time').textContent = targetLatency;
+
+      animateSvgOptimization(stage.showOptimizations && model.hasPrunedLayer);
+    }
+
+    function animateCounter(elementId, targetVal) {
+      const el = document.getElementById(elementId);
+      const startVal = parseInt(el.textContent) || 0;
+      if (typeof gsap !== 'undefined') {
+        const obj = { val: startVal };
+        gsap.to(obj, {
+          val: targetVal,
+          duration: 0.5,
+          ease: "power2.out",
+          onUpdate: () => {
+            el.textContent = Math.round(obj.val);
+          }
+        });
+      } else {
+        el.textContent = targetVal;
+      }
+    }
+
+    function animateSvgOptimization(isOptimized) {
+      if (typeof gsap !== 'undefined') {
+        const tl = gsap.timeline();
+
+        if (isOptimized) {
+          // Author focal sequence: collapse layer 2 and dead softmax
+          tl.to('#cross-l2', { opacity: 1, duration: 0.35, ease: "power2.out" })
+            .to('#node-l2', { opacity: 0.25, duration: 0.35, ease: "power2.out" }, "-=0.2")
+            .to('#cross-softmax', { opacity: 1, duration: 0.35, ease: "power2.out" }, "-=0.2")
+            .to('#node-softmax', { opacity: 0.25, duration: 0.35, ease: "power2.out" }, "-=0.2")
+            .to('#wire-bypass', { opacity: 1, stroke: "#10b981", duration: 0.45, ease: "power2.out" }, "-=0.15")
+            .to('#wire-l1-l2, #wire-l2-l3', { opacity: 0.15, duration: 0.35, ease: "power2.out" }, "-=0.3");
+          
+          document.getElementById('animation-status-text').innerHTML = 
+            "<span class='text-emerald-400 font-semibold'>Optimized Circuit:</span> Layer 2 constant-folded + Softmax dead constraint pruned.";
+        } else {
+          tl.to('#cross-l2, #cross-softmax', { opacity: 0, duration: 0.25, ease: "power2.out" })
+            .to('#node-l2, #node-softmax', { opacity: 1, duration: 0.25, ease: "power2.out" })
+            .to('#wire-bypass', { opacity: 0, duration: 0.25, ease: "power2.out" })
+            .to('#wire-l1-l2, #wire-l2-l3', { opacity: 1, duration: 0.25, ease: "power2.out" });
+
+          document.getElementById('animation-status-text').textContent = 
+            "Baseline: All layers and constraint heads active";
+        }
+      }
+    }
+
+    function toggleAutoPlay() {
+      const playLabel = document.getElementById('play-label');
+      if (autoPlayInterval) {
+        clearInterval(autoPlayInterval);
+        autoPlayInterval = null;
+        playLabel.textContent = "Play Pipeline";
+      } else {
+        playLabel.textContent = "Pause";
+        autoPlayInterval = setInterval(() => {
+          stepStage(1);
+        }, 2600);
+      }
+    }
+
+    function toggleCodeHighlights() {
+      diffHighlighted = !diffHighlighted;
+      const btn = document.getElementById('btn-toggle-diff');
+      const text = document.getElementById('diff-toggle-text');
+      
+      const leftPrune1 = document.getElementById('code-left-prune-1');
+      const leftPrune2 = document.getElementById('code-left-prune-2');
+      const leftPrune3 = document.getElementById('code-left-prune-3');
+      const rightOpt1 = document.getElementById('code-right-opt-1');
+      const rightOpt2 = document.getElementById('code-right-opt-2');
+
+      if (diffHighlighted) {
+        btn.setAttribute('aria-pressed', 'true');
+        text.textContent = "Reset Highlights";
+        leftPrune1.className = "pl-4 text-rose-300 bg-rose-950/40 py-1 rounded font-medium";
+        leftPrune2.className = "pl-4 text-rose-300 bg-rose-950/40 py-1 rounded font-medium";
+        leftPrune3.className = "pl-4 text-rose-300 bg-rose-950/40 py-1 rounded font-medium";
+        rightOpt1.className = "pl-4 text-emerald-300 bg-emerald-950/40 py-1 rounded font-medium";
+        rightOpt2.className = "pl-4 text-emerald-300 bg-emerald-950/40 py-1 rounded font-medium";
+      } else {
+        btn.setAttribute('aria-pressed', 'false');
+        text.textContent = "Highlight Pruned Waste";
+        leftPrune1.className = "pl-4 text-slate-300 transition-colors duration-200 py-0.5 rounded";
+        leftPrune2.className = "pl-4 text-slate-300 transition-colors duration-200 py-1 rounded";
+        leftPrune3.className = "pl-4 text-slate-300 transition-colors duration-200 py-1 rounded";
+        rightOpt1.className = "pl-4 text-slate-300 transition-colors duration-200 py-0.5 rounded";
+        rightOpt2.className = "pl-4 text-slate-300 transition-colors duration-200 py-0.5 rounded";
+      }
+    }
+
+    function simulateVerification(type) {
+      const box = document.getElementById('verify-box');
+      const badge = document.getElementById('verify-badge');
+      const msg = document.getElementById('verify-message');
+
+      if (type === 'honest') {
+        box.className = "p-4 rounded-xl border bg-emerald-950/25 border-emerald-500/40 mb-4 transition-all duration-200";
+        badge.className = "px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500 text-slate-950";
+        badge.textContent = "VERIFIED (OK)";
+        msg.innerHTML = "Proof constraint check: 8/8 satisfied.<br>Model Commitment: SHA-256 verified.<br>Prediction Transcript: Authentic.";
+      } else if (type === 'tamper-model') {
+        box.className = "p-4 rounded-xl border bg-rose-950/30 border-rose-500/40 mb-4 transition-all duration-200";
+        badge.className = "px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500 text-white";
+        badge.textContent = "TAMPER DETECTED";
+        msg.innerHTML = "<strong class='text-rose-400'>Model Commitment Mismatch:</strong> Expected SHA-256 hash does not match modified weights.<br>Verifier rejected model transcript.";
+      } else if (type === 'tamper-pred') {
+        box.className = "p-4 rounded-xl border bg-amber-950/30 border-amber-500/40 mb-4 transition-all duration-200";
+        badge.className = "px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500 text-slate-950";
+        badge.textContent = "TRANSCRIPT REJECTED";
+        msg.innerHTML = "<strong class='text-amber-400'>Transcript Mismatch:</strong> Published prediction does not match evaluated witness output.<br>Verifier rejected proof.";
+      }
+
+      if (typeof gsap !== 'undefined') {
+        gsap.fromTo(box, { scale: 0.985 }, { scale: 1, duration: 0.25, ease: "power2.out" });
+      }
+    }
+  </script>
+</body>
+</html>
