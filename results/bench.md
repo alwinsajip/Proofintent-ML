@@ -5,10 +5,10 @@ Times are the mean of 5 runs.
 
 | Model | Mode | R1CS cost | Rows | Prove (ms) | Emulated prove (ms) | Verify (ms) | Peak mem (KB) | Verify OK |
 |-------|------|-----------|------|------------|---------------------|-------------|---------------|-----------|
-| mlp_small | baseline | 31 | 8 | 7.01 | 19.67 | 1.16 | 13.1 | True |
-| mlp_small | optimized | 22 | 8 | 7.07 | 13.54 | 1.25 | 12.0 | True |
-| mlp_large | baseline | 103 | 9 | 16.11 | 71.30 | 2.25 | 34.9 | True |
-| mlp_large | optimized | 20 | 4 | 16.06 | 13.46 | 1.95 | 34.5 | True |
+| mlp_small | baseline | 31 | 8 | 5.54 | 22.90 | 0.89 | 13.4 | True |
+| mlp_small | optimized | 22 | 8 | 7.59 | 17.64 | 1.38 | 12.0 | True |
+| mlp_large | baseline | 103 | 9 | 13.95 | 84.84 | 1.40 | 34.9 | True |
+| mlp_large | optimized | 20 | 4 | 13.41 | 15.42 | 1.47 | 34.6 | True |
 
 `Emulated prove` is a cost-proportional workload (field-multiply emulations per R1CS constraint) that illustrates how constraint reduction maps to proving effort on a real backend.
 
